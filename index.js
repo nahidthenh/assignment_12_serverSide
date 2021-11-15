@@ -12,28 +12,10 @@ const port = process.env.PORT || 9000;
 app.use(cors());
 app.use(express.json());
 
-// const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.rcem2.mongodb.net/myFirstDatabase?retryWrites=true&w=majority`;
-// const client = new MongoClient(uri, {
-//   useNewUrlParser: true,
-//   useUnifiedTopology: true,
-// });
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.muhos.mongodb.net/myFirstDatabase?retryWrites=true&w=majority`;
+const uri =
+  `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.muhos.mongodb.net/myFirstDatabase?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
-
-
 // console.log(uri);
-
-async function verifyToken(req, res, next) {
-  if (req.headers?.authorization?.startsWith("Bearer ")) {
-    const token = req.headers.authorization.split(" ")[1];
-
-    try {
-      const decodedUser = await admin.auth().verifyIdToken(token);
-      req.decodedEmail = decodedUser.email;
-    } catch { }
-  }
-  next();
-}
 
 async function run() {
   try {
@@ -77,14 +59,12 @@ async function run() {
       res.json(result);
     });
     // insert order and
-
     app.post("/addOrders", async (req, res) => {
       const result = await ordersCollection.insertOne(req.body);
       res.send(result);
     });
 
     //  my order
-
     app.get("/myOrder/:email", async (req, res) => {
       console.log(req.params.email);
       const result = await ordersCollection
@@ -106,14 +86,34 @@ async function run() {
       res.send(result);
     });
 
-    // app.post("/addUserInfo", async (req, res) => {
-    //   console.log("req.body");
-    //   const result = await usersCollection.insertOne(req.body);
-    //   res.send(result);
-    //   console.log(result);
-    // });
-    //  make admin
+    /// all order
+    app.get("/allOrders", async (req, res) => {
+      // console.log("hello");
+      const result = await ordersCollection.find({}).toArray();
+      res.send(result);
+    });
 
+    // status update
+    app.put("/statusUpdate/:id", async (req, res) => {
+      const filter = { _id: ObjectId(req.params.id) };
+      console.log(req.params.id);
+      const result = await ordersCollection.updateOne(filter, {
+        $set: {
+          status: req.body.status,
+        },
+      });
+      res.send(result);
+      console.log(result);
+    });
+    // check admin or not
+    app.get("/checkAdmin/:email", async (req, res) => {
+      const result = await usersCollection
+        .find({ email: req.params.email })
+        .toArray();
+      console.log(result);
+      res.send(result);
+    });
+    //  make admin
     app.get("/users/:email", async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
@@ -145,24 +145,13 @@ async function run() {
       res.json(result);
     });
 
-    app.put("/users/admin", verifyToken, async (req, res) => {
+    app.put("/users/admin", async (req, res) => {
       const user = req.body;
-      const requester = req.decodedEmail;
-      if (requester) {
-        const requesterAccount = await usersCollection.findOne({
-          email: requester,
-        });
-        if (requesterAccount.role === "admin") {
-          const filter = { email: user.email };
-          const updateDoc = { $set: { role: "admin" } };
-          const result = await usersCollection.updateOne(filter, updateDoc);
-          res.json(result);
-        }
-      } else {
-        res
-          .status(403)
-          .json({ message: "you do not have access to make admin" });
-      }
+      console.log("put", user);
+      const filter = { email: user.email };
+      const updateDoc = { $set: { role: "admin" } };
+      const result = await usersCollection.updateOne(filter, updateDoc);
+      res.json(result);
     });
   } finally {
     // await client.close();
